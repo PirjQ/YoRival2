@@ -128,10 +128,7 @@ export function HomePageClient() {
     return <PageSkeleton />;
   }
 
-  // 3. Now, if we have a user and we know their profile is null (or doesn't exist), show the setup form.
-  if (user && profile === null) {
-    return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
-  }
+
 
   // 3. If a specific debate is selected, show that view.
   if (selectedDebate) {
