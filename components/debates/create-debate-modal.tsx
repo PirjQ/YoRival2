@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthContext } from '@/contexts/auth-provider';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,7 @@ export function CreateDebateModal({ isOpen, onClose, onDebateCreated }: CreateDe
   const [topic, setTopic] = useState('');
   const [sideAName, setSideAName] = useState('');
   const [sideBName, setSideBName] = useState('');
-  const { user } = useAuth();
+  const { user } = useAuthContext();
   const { toast } = useToast();
 
   const resetForm = () => {
