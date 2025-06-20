@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { useAuthContext } from '@/contexts/auth-provider';
 // We no longer need to import useAuthContext here.
 
 // The onComplete prop is required again.
@@ -21,6 +22,7 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { refreshProfile } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,6 +52,7 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
       // FIX: We are no longer calling the non-existent `refreshProfile`.
       // We are going back to the reliable `onComplete` prop that tells the parent to handle it.
       onComplete();
+      await refreshProfile();
 
     } catch (error: any) {
       toast({ title: 'Error creating profile', description: error.message, variant: 'destructive' });
