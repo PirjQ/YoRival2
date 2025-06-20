@@ -25,37 +25,41 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Always start loading
 
-  const fetchProfile = useCallback(async (user: User | null) => {
-    if (!user) {
-      setProfile(null);
-      return;
-    }
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (error && error.code !== 'PGRST116') {
-      console.error("Profile fetch error:", error);
-    }
-    setProfile(data);
-  }, []);
-
+  // This useEffect handles ONLY the authentication state.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        // THIS IS THE KEY FIX:
-        // 1. Set the session.
-        setSession(session);
-        // 2. Fetch the profile based on the new session.
-        await fetchProfile(session?.user ?? null);
-        // 3. ONLY after BOTH are done, set loading to false.
-        setLoading(false);
-      }
-    );
+    // onAuthStateChange fires immediately with the current session,
+    // so we don't need a separate getSession() call. This is the key.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      // The moment we know the session, we are no longer loading the auth state.
+      setLoading(false);
+    });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, []); // The empty array ensures this runs only ONCE.
+
+  // This SECOND useEffect handles fetching the profile.
+  // It runs only when the session changes.
+  useEffect(() => {
+    const user = session?.user;
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          setProfile(data);
+        });
+    } else {
+      // Clear profile when user logs out
+      setProfile(null);
+    }
+  }, [session]); // This hook depends only on the session.
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
