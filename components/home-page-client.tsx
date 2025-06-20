@@ -119,7 +119,7 @@ export function HomePageClient() {
 
   // 3. If auth is done, we have a user, and we know for a fact their profile is `null`.
   if (user && profile === null) {
-    return <ProfileSetup userId={user.id} />;
+     return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
   }
 
   // 4. If a specific debate is selected, show its view.
