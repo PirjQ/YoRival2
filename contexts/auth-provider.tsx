@@ -53,7 +53,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .eq('id', user.id)
         .single()
         .then(({ data }) => {
-          setProfile(data);
+          setProfile(data || null);
         });
     } else {
       // Clear profile when user logs out
