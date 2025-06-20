@@ -10,7 +10,7 @@ import { DebateView } from '@/components/debates/debate-view';
 import { CreateDebateModal } from '@/components/debates/create-debate-modal';
 import { PageSkeleton } from '@/components/page-skeleton';
 import { ProfileSetup } from '@/components/auth/profile-setup';
-import { Plus, Users, Share2, Loader2 } from 'lucide-react';
+import { Plus, Users, Share2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/ui/logo';
 
@@ -32,12 +32,7 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
   const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'votes'>('recent');
-  const [mounted, setMounted] = useState(false);
-
-  // Prevent hydration mismatch by only rendering after mount
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  // The old `mounted` state and its useEffect have been COMPLETELY REMOVED.
 
   // Set up real-time subscription for debates
   useEffect(() => {
@@ -65,47 +60,38 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
 
   // Handle URL parameter changes
   useEffect(() => {
-    if (!mounted) return;
-    
     const debateId = searchParams.get('debate');
     if (debateId) {
       fetchDebateById(debateId);
     } else {
       setSelectedDebate(null);
     }
-  }, [searchParams, mounted]);
+  }, [searchParams]);
 
   const fetchDebateById = async (debateId: string) => {
     const { data, error } = await supabase.from('debates').select('*').eq('id', debateId).maybeSingle();
     if (error) console.error('Error fetching debate:', error);
-    if (data) setSelectedDebate(data);
+    if (data) setSelectedDebate(data as Debate);
   };
   
   const fetchAndSortDebates = useCallback(async () => {
-    const { data, error } = await supabase.from('debates').select('*');
+    const { data, error } = await supabase.from('debates').select('*').order(sortBy === 'recent' ? 'created_at' : 'side_a_count', { ascending: false });
     if (error) {
       console.error('Error fetching debates:', error);
       return;
     }
     if (data) {
-      const sorted = [...data].sort((a, b) => {
-        if (sortBy === 'votes') {
-          const totalVotesA = a.side_a_count + a.side_b_count;
-          const totalVotesB = b.side_a_count + b.side_b_count;
-          if (totalVotesA !== totalVotesB) return totalVotesB - totalVotesA;
-        }
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-      });
-      setDebates(sorted.slice(0, 20));
+      if (sortBy === 'votes') {
+        data.sort((a, b) => (b.side_a_count + b.side_b_count) - (a.side_a_count + a.side_b_count));
+      }
+      setDebates(data.slice(0, 20));
     }
   }, [sortBy]);
 
   useEffect(() => {
-    if (mounted) {
-      fetchAndSortDebates();
-    }
-  }, [sortBy, fetchAndSortDebates, mounted]);
-
+    fetchAndSortDebates();
+  }, [sortBy, fetchAndSortDebates]);
+  
   const handleDebateCreated = () => {
     fetchAndSortDebates();
   };
@@ -121,26 +107,24 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
     window.history.pushState({}, '', window.location.pathname);
   }, []);
 
-  // Show loading state while auth is initializing or component is mounting
-  
+  // === THIS IS THE ONLY RENDER LOGIC YOU NEED AT THE TOP ===
 
-  // Show profile setup if user exists but no profile
-  // THIS IS THE NEW RENDER LOGIC
+  // 1. If the AuthProvider is still checking the session, show the full page skeleton.
   if (authLoading) {
-    // Show a full page skeleton while the auth provider initializes
     return <PageSkeleton />;
   }
 
+  // 2. If auth is done loading, AND a user exists, BUT they don't have a profile yet.
   if (user && !profile) {
-    // If auth is done loading and user exists but has no profile, show setup
     return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
   }
 
+  // 3. If a specific debate is selected, show that view.
   if (selectedDebate) {
-    // If a debate is selected, show its view
-    return <DebateView debate={selectedDebate} onBack={() => setSelectedDebate(null)} />;
+    return <DebateView debate={selectedDebate} onBack={handleBackToDebates} />;
   }
 
+  // 4. If none of the above are true, show the main dashboard.
   return (
     <>
       <div className="space-y-8">
