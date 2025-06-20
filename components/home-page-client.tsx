@@ -10,7 +10,7 @@ import { DebateView } from '@/components/debates/debate-view';
 import { CreateDebateModal } from '@/components/debates/create-debate-modal';
 import { PageSkeleton } from '@/components/page-skeleton';
 import { ProfileSetup } from '@/components/auth/profile-setup';
-import { Plus, Users, Share2 } from 'lucide-react';
+import { Plus, Users, Share2, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/ui/logo';
 
@@ -25,14 +25,40 @@ type Debate = {
   side_b_count: number;
 };
 
-export function HomePageClient({ initialDebates }: { initialDebates: Debate[] }) {
+// This component no longer accepts `initialDebates` as a prop.
+export function HomePageClient() {
   const { user, profile, loading: authLoading } = useAuthContext();
   const searchParams = useSearchParams();
-  const [debates, setDebates] = useState<Debate[]>(initialDebates);
+  const [debates, setDebates] = useState<Debate[]>([]);
+  // A new, separate loading state specifically for the debates data.
+  const [dataLoading, setDataLoading] = useState(true);
   const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'votes'>('recent');
-  // The old `mounted` state and its useEffect have been COMPLETELY REMOVED.
+
+  const fetchAndSortDebates = useCallback(async () => {
+    setDataLoading(true); // Start loading data
+    const { data, error } = await supabase.from('debates').select('*').limit(50); // Fetch a good amount
+    
+    if (error) {
+      console.error('Error fetching debates:', error);
+      setDebates([]); // Set to empty array on error
+    } else if (data) {
+      const sortedData = [...data].sort((a, b) => {
+        if (sortBy === 'votes') {
+          return (b.side_a_count + b.side_b_count) - (a.side_a_count + a.side_b_count);
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setDebates(sortedData);
+    }
+    setDataLoading(false); // Finish loading data
+  }, [sortBy]);
+
+  // This useEffect now triggers the initial data fetch and re-fetches when sort changes.
+  useEffect(() => {
+    fetchAndSortDebates();
+  }, [fetchAndSortDebates]); // `fetchAndSortDebates` depends on `sortBy`, so this is correct.
 
   // Set up real-time subscription for debates
   useEffect(() => {
@@ -43,7 +69,8 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
         { event: 'INSERT', schema: 'public', table: 'debates' },
         (payload) => {
           const newDebate = payload.new as Debate;
-          setDebates(prev => [newDebate, ...prev].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 20));
+          // Just add the new debate to the top without re-sorting everything
+          setDebates(prev => [newDebate, ...prev]); 
         }
       )
       .on(
@@ -58,6 +85,12 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
     return () => { subscription.unsubscribe(); };
   }, []);
 
+  const fetchDebateById = async (debateId: string) => {
+    const { data, error } = await supabase.from('debates').select('*').eq('id', debateId).maybeSingle();
+    if (error) console.error('Error fetching debate:', error);
+    if (data) setSelectedDebate(data as Debate);
+  };
+
   // Handle URL parameter changes
   useEffect(() => {
     const debateId = searchParams.get('debate');
@@ -67,33 +100,9 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
       setSelectedDebate(null);
     }
   }, [searchParams]);
-
-  const fetchDebateById = async (debateId: string) => {
-    const { data, error } = await supabase.from('debates').select('*').eq('id', debateId).maybeSingle();
-    if (error) console.error('Error fetching debate:', error);
-    if (data) setSelectedDebate(data as Debate);
-  };
-  
-  const fetchAndSortDebates = useCallback(async () => {
-    const { data, error } = await supabase.from('debates').select('*').order(sortBy === 'recent' ? 'created_at' : 'side_a_count', { ascending: false });
-    if (error) {
-      console.error('Error fetching debates:', error);
-      return;
-    }
-    if (data) {
-      if (sortBy === 'votes') {
-        data.sort((a, b) => (b.side_a_count + b.side_b_count) - (a.side_a_count + a.side_b_count));
-      }
-      setDebates(data.slice(0, 20));
-    }
-  }, [sortBy]);
-
-  useEffect(() => {
-    fetchAndSortDebates();
-  }, [sortBy, fetchAndSortDebates]);
   
   const handleDebateCreated = () => {
-    fetchAndSortDebates();
+    fetchAndSortDebates(); // Re-fetch all debates after creating a new one
   };
 
   const handleDebateSelect = useCallback((debate: Debate) => {
@@ -107,7 +116,7 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
     window.history.pushState({}, '', window.location.pathname);
   }, []);
 
-  // === THIS IS THE ONLY RENDER LOGIC YOU NEED AT THE TOP ===
+  // === THIS IS THE FINAL RENDER LOGIC ===
 
   // 1. If the AuthProvider is still checking the session, show the full page skeleton.
   if (authLoading) {
@@ -169,7 +178,12 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
           </p>
         </div>
         
-        {debates.length > 0 ? (
+        {dataLoading ? (
+            <div className="text-center py-12 flex justify-center items-center space-x-2">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                <span className="text-slate-400">Loading Rivalries...</span>
+            </div>
+        ) : debates.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {debates.map((debate) => (<DebateCard key={debate.id} debate={debate} onClick={() => handleDebateSelect(debate)} />))}
           </div>
