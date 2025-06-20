@@ -1,4 +1,3 @@
-// components/home-page-client.tsx
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
@@ -26,22 +25,24 @@ type Debate = {
   side_b_count: number;
 };
 
+// This component no longer accepts `initialDebates` as a prop.
 export function HomePageClient() {
   const { user, profile, loading: authLoading } = useAuthContext();
   const searchParams = useSearchParams();
   const [debates, setDebates] = useState<Debate[]>([]);
+  // A new, separate loading state specifically for the debates data.
   const [dataLoading, setDataLoading] = useState(true);
   const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'votes'>('recent');
 
   const fetchAndSortDebates = useCallback(async () => {
-    setDataLoading(true);
-    const { data, error } = await supabase.from('debates').select('*').limit(50);
+    setDataLoading(true); // Start loading data
+    const { data, error } = await supabase.from('debates').select('*').limit(50); // Fetch a good amount
     
     if (error) {
       console.error('Error fetching debates:', error);
-      setDebates([]);
+      setDebates([]); // Set to empty array on error
     } else if (data) {
       const sortedData = [...data].sort((a, b) => {
         if (sortBy === 'votes') {
@@ -51,23 +52,35 @@ export function HomePageClient() {
       });
       setDebates(sortedData);
     }
-    setDataLoading(false);
+    setDataLoading(false); // Finish loading data
   }, [sortBy]);
 
+  // This useEffect now triggers the initial data fetch and re-fetches when sort changes.
   useEffect(() => {
     fetchAndSortDebates();
-  }, [fetchAndSortDebates]);
+  }, [fetchAndSortDebates]); // `fetchAndSortDebates` depends on `sortBy`, so this is correct.
 
+  // Set up real-time subscription for debates
   useEffect(() => {
-    const subscription = supabase.channel('debates-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'debates' }, (payload) => {
-        const newDebate = payload.new as Debate;
-        setDebates(prev => [newDebate, ...prev]);
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'debates' }, (payload) => {
-        const updatedDebate = payload.new as Debate;
-        setDebates(prev => prev.map(d => d.id === updatedDebate.id ? updatedDebate : d));
-      })
+    const subscription = supabase
+      .channel('debates-realtime')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'debates' },
+        (payload) => {
+          const newDebate = payload.new as Debate;
+          // Just add the new debate to the top without re-sorting everything
+          setDebates(prev => [newDebate, ...prev]); 
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'debates' },
+        (payload) => {
+          const updatedDebate = payload.new as Debate;
+          setDebates(prev => prev.map(d => d.id === updatedDebate.id ? updatedDebate : d));
+        }
+      )
       .subscribe();
     return () => { subscription.unsubscribe(); };
   }, []);
@@ -78,6 +91,7 @@ export function HomePageClient() {
     if (data) setSelectedDebate(data as Debate);
   };
 
+  // Handle URL parameter changes
   useEffect(() => {
     const debateId = searchParams.get('debate');
     if (debateId) {
@@ -88,7 +102,7 @@ export function HomePageClient() {
   }, [searchParams]);
   
   const handleDebateCreated = () => {
-    fetchAndSortDebates();
+    fetchAndSortDebates(); // Re-fetch all debates after creating a new one
   };
 
   const handleDebateSelect = useCallback((debate: Debate) => {
@@ -102,19 +116,29 @@ export function HomePageClient() {
     window.history.pushState({}, '', window.location.pathname);
   }, []);
 
-  // Final, correct render logic
+  // === THIS IS THE FINAL RENDER LOGIC ===
+
+  // 1. If the AuthProvider is still checking the session, show the full page skeleton.
   if (authLoading) {
     return <PageSkeleton />;
   }
 
-  if (user && !profile) {
-    return <ProfileSetup userId={user.id} />;
+  // 2. If auth is done loading, AND a user exists, BUT they don't have a profile yet.
+  if (user && profile === undefined) {
+    return <PageSkeleton />;
   }
 
+  // 3. Now, if we have a user and we know their profile is null (or doesn't exist), show the setup form.
+  if (user && profile === null) {
+    return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
+  }
+
+  // 3. If a specific debate is selected, show that view.
   if (selectedDebate) {
     return <DebateView debate={selectedDebate} onBack={handleBackToDebates} />;
   }
 
+  // 4. If none of the above are true, show the main dashboard.
   return (
     <>
       <div className="space-y-8">
@@ -141,7 +165,10 @@ export function HomePageClient() {
           </div>
           <div className="flex items-center">
             {user && profile && (
-              <Button onClick={() => setShowCreateModal(true)} className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto text-sm sm:text-base px-3 sm:px-4">
+              <Button 
+                onClick={() => setShowCreateModal(true)} 
+                className="bg-purple-600 hover:bg-purple-700 text-white w-full sm:w-auto text-sm sm:text-base px-3 sm:px-4"
+              >
                 <Plus className="w-4 h-4 mr-1 sm:mr-2" />
                 <span className="hidden sm:inline">Start a New Rivalry</span>
                 <span className="sm:hidden">New Rivalry</span>
@@ -149,14 +176,18 @@ export function HomePageClient() {
             )}
           </div>
         </div>
+        
         <div className="text-center">
-          <p className="text-slate-400 text-sm italic">Open to all kinds of silliest of arguments you can think of</p>
+          <p className="text-slate-400 text-sm italic">
+            Open to all kinds of silliest of arguments you can think of
+          </p>
         </div>
+        
         {dataLoading ? (
-          <div className="text-center py-12 flex justify-center items-center space-x-2">
-            <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
-            <span className="text-slate-400">Loading Rivalries...</span>
-          </div>
+            <div className="text-center py-12 flex justify-center items-center space-x-2">
+                <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                <span className="text-slate-400">Loading Rivalries...</span>
+            </div>
         ) : debates.length > 0 ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {debates.map((debate) => (<DebateCard key={debate.id} debate={debate} onClick={() => handleDebateSelect(debate)} />))}
@@ -167,7 +198,10 @@ export function HomePageClient() {
             <h3 className="text-xl font-semibold text-slate-400 mb-2">No rivalries yet</h3>
             <p className="text-slate-500 mb-6">Be the first to start a rivalry!</p>
             {user && profile && (
-              <Button onClick={() => setShowCreateModal(true)} className="bg-purple-600 hover:bg-purple-700 text-white">
+              <Button 
+                onClick={() => setShowCreateModal(true)} 
+                className="bg-purple-600 hover:bg-purple-700 text-white"
+              >
                 <Plus className="w-4 h-4 mr-2" />
                 Launch Your First Rivalry
               </Button>
