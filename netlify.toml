@@ -1,8 +1,4 @@
 [build]
-command = "npm run build"
-publish = "out"
-
-[[redirects]]
-from = "/*"
-to = "/index.html"
-status = 200
+  command = "npm run build"
+  # The publish directory is now ".next" for an SSR app.
+  publish = ".next"
