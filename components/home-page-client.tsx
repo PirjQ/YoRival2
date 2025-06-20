@@ -120,6 +120,7 @@ export function HomePageClient() {
   // 3. If we have a user, and we know for a fact their profile is `null`.
   if (user && profile === null) {
     return <ProfileSetup userId={user.id} />;
+  }
 
   // 4. If a specific debate is selected, show its view.
   if (selectedDebate) {
