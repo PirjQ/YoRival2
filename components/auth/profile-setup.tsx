@@ -1,7 +1,7 @@
+// components/auth/profile-setup.tsx
 'use client';
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -9,37 +9,33 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+// FIX 1: Import the new context hook
+import { useAuthContext } from '@/contexts/auth-provider';
 
+// FIX 2: The `onComplete` prop is no longer needed or required.
 interface ProfileSetupProps {
   userId: string;
-  onComplete: () => void;
 }
 
-export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
+export function ProfileSetup({ userId }: ProfileSetupProps) {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  const router = useRouter();
-
-  useEffect(() => {
-    // No need to check for pending username anymore
-  }, []);
+  // FIX 3: Get the `refreshProfile` function from our one true source.
+  const { refreshProfile } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim()) return;
     setLoading(true);
 
     try {
       // Check if username is taken
-      const { data: existingProfile, error: checkError } = await supabase
+      const { data: existingProfile } = await supabase
         .from('profiles')
         .select('username')
         .eq('username', username)
         .maybeSingle();
-
-      if (checkError) {
-        throw checkError;
-      }
 
       if (existingProfile) {
         toast({
@@ -52,11 +48,7 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
       }
 
       // Create profile
-      const { error } = await supabase.from('profiles').insert({
-        id: userId,
-        username,
-      });
-
+      const { error } = await supabase.from('profiles').insert({ id: userId, username });
       if (error) throw error;
 
       toast({
@@ -64,12 +56,15 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
         description: 'Welcome to YoRival!',
       });
 
-      
-      // Call onComplete to refresh the profile data
-      onComplete();
+      // FIX 4: This is the key. We tell the global provider to refresh its state.
+      // This will automatically change the `status` to 'authenticated_with_profile',
+      // causing HomePageClient to re-render and show the main page.
+      // No page reload or `onComplete` prop needed.
+      await refreshProfile();
+
     } catch (error: any) {
       toast({
-        title: 'Error',
+        title: 'Error creating profile',
         description: error.message,
         variant: 'destructive',
       });
