@@ -9,7 +9,6 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-import { useAuthContext } from '@/contexts/auth-provider';
 
 interface ProfileSetupProps {
   userId: string;
@@ -21,7 +20,6 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
   const router = useRouter();
-  const { refreshProfile } = useAuthContext();
 
   useEffect(() => {
     // No need to check for pending username anymore
@@ -66,7 +64,6 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
         description: 'Welcome to YoRival!',
       });
 
-      await refreshProfile();
       
       // Call onComplete to refresh the profile data
       onComplete();
