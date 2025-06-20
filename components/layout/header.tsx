@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthContext } from '@/contexts/auth-provider';
 import { Button } from '@/components/ui/button';
 import { AuthModal } from '@/components/auth/auth-modal';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -12,7 +12,7 @@ import { Logo } from '@/components/ui/logo';
 
 export function Header() {
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const { user, profile, loading, signOut } = useAuth();
+  const { user, profile, loading, signOut } = useAuthContext();
 
   const handleSignOut = async () => {
     await signOut();
