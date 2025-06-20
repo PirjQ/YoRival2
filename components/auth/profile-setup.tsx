@@ -26,7 +26,6 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!username.trim()) return;
     setLoading(true);
 
     try {
