@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthContext } from '@/contexts/auth-provider';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -43,7 +43,7 @@ interface DebateViewProps {
 }
 
 export function DebateView({ debate: initialDebate, onBack }: DebateViewProps) {
-  const { user, profile } = useAuth();
+  const { user, profile } = useAuthContext();
   const { toast } = useToast();
   const [debate, setDebate] = useState<DebateData>({
     ...initialDebate,
