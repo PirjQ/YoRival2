@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { DebateCard } from '@/components/debates/debate-card';
 import { DebateView } from '@/components/debates/debate-view';
 import { CreateDebateModal } from '@/components/debates/create-debate-modal';
+import { PageSkeleton } from '@/components/page-skeleton';
 import { ProfileSetup } from '@/components/auth/profile-setup';
 import { Plus, Users, Share2, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -25,7 +26,7 @@ type Debate = {
 };
 
 export function HomePageClient({ initialDebates }: { initialDebates: Debate[] }) {
-  const { user, profile, loading } = useAuthContext();
+  const { user, profile, loading: authLoading } = useAuthContext();
   const searchParams = useSearchParams();
   const [debates, setDebates] = useState<Debate[]>(initialDebates);
   const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
@@ -121,40 +122,23 @@ export function HomePageClient({ initialDebates }: { initialDebates: Debate[] })
   }, []);
 
   // Show loading state while auth is initializing or component is mounting
-  if (!mounted) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-        <Logo size="lg" className="w-16 h-16 animate-pulse text-purple-400" />
-        <div className="flex items-center space-x-2">
-          <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-          <p className="text-slate-400">Loading YoRival...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading while the auth state is being determined.
-if (loading) {
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen space-y-4">
-      <Logo size="lg" className="w-16 h-16 animate-pulse text-purple-400" />
-      <div className="flex items-center space-x-2">
-        <Loader2 className="h-4 w-4 animate-spin text-slate-400" />
-        <p className="text-slate-400">Initializing...</p>
-      </div>
-    </div>
-  );
-}
+  
 
   // Show profile setup if user exists but no profile
-  if (user && !profile && !loading) {
-    return <ProfileSetup userId={user.id} onComplete={() => {
-      window.location.href = '/';
-    }} />;
+  // THIS IS THE NEW RENDER LOGIC
+  if (authLoading) {
+    // Show a full page skeleton while the auth provider initializes
+    return <PageSkeleton />;
+  }
+
+  if (user && !profile) {
+    // If auth is done loading and user exists but has no profile, show setup
+    return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
   }
 
   if (selectedDebate) {
-    return <DebateView debate={selectedDebate} onBack={handleBackToDebates} />;
+    // If a debate is selected, show its view
+    return <DebateView debate={selectedDebate} onBack={() => setSelectedDebate(null)} />;
   }
 
   return (
