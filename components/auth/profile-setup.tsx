@@ -63,6 +63,8 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
         title: 'Profile created!',
         description: 'Welcome to YoRival!',
       });
+
+      await refreshProfile();
       
       // Call onComplete to refresh the profile data
       onComplete();
