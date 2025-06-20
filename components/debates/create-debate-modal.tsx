@@ -22,7 +22,7 @@ export function CreateDebateModal({ isOpen, onClose, onDebateCreated }: CreateDe
   const [topic, setTopic] = useState('');
   const [sideAName, setSideAName] = useState('');
   const [sideBName, setSideBName] = useState('');
-  const { user } = useAuthContext();
+  const { user, profile } = useAuthContext();
   const { toast } = useToast();
 
   const resetForm = () => {
