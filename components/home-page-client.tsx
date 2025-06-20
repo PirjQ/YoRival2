@@ -25,24 +25,24 @@ type Debate = {
   side_b_count: number;
 };
 
-// This component no longer accepts `initialDebates` as a prop.
 export function HomePageClient() {
+  // FIX 1: Get `status` from the context, not `loading`.
   const { user, profile, status } = useAuthContext();
+  
   const searchParams = useSearchParams();
   const [debates, setDebates] = useState<Debate[]>([]);
-  // A new, separate loading state specifically for the debates data.
   const [dataLoading, setDataLoading] = useState(true);
   const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [sortBy, setSortBy] = useState<'recent' | 'votes'>('recent');
 
   const fetchAndSortDebates = useCallback(async () => {
-    setDataLoading(true); // Start loading data
-    const { data, error } = await supabase.from('debates').select('*').limit(50); // Fetch a good amount
+    setDataLoading(true);
+    const { data, error } = await supabase.from('debates').select('*').limit(50);
     
     if (error) {
       console.error('Error fetching debates:', error);
-      setDebates([]); // Set to empty array on error
+      setDebates([]);
     } else if (data) {
       const sortedData = [...data].sort((a, b) => {
         if (sortBy === 'votes') {
@@ -52,31 +52,22 @@ export function HomePageClient() {
       });
       setDebates(sortedData);
     }
-    setDataLoading(false); // Finish loading data
+    setDataLoading(false);
   }, [sortBy]);
 
-  // This useEffect now triggers the initial data fetch and re-fetches when sort changes.
   useEffect(() => {
     fetchAndSortDebates();
-  }, [fetchAndSortDebates]); // `fetchAndSortDebates` depends on `sortBy`, so this is correct.
+  }, [fetchAndSortDebates]);
 
-  // Set up real-time subscription for debates
   useEffect(() => {
     const subscription = supabase
       .channel('debates-realtime')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'debates' },
-        (payload) => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'debates' }, (payload) => {
           const newDebate = payload.new as Debate;
-          // Just add the new debate to the top without re-sorting everything
           setDebates(prev => [newDebate, ...prev]); 
         }
       )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'debates' },
-        (payload) => {
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'debates' }, (payload) => {
           const updatedDebate = payload.new as Debate;
           setDebates(prev => prev.map(d => d.id === updatedDebate.id ? updatedDebate : d));
         }
@@ -91,7 +82,6 @@ export function HomePageClient() {
     if (data) setSelectedDebate(data as Debate);
   };
 
-  // Handle URL parameter changes
   useEffect(() => {
     const debateId = searchParams.get('debate');
     if (debateId) {
@@ -102,7 +92,7 @@ export function HomePageClient() {
   }, [searchParams]);
   
   const handleDebateCreated = () => {
-    fetchAndSortDebates(); // Re-fetch all debates after creating a new one
+    fetchAndSortDebates();
   };
 
   const handleDebateSelect = useCallback((debate: Debate) => {
@@ -116,19 +106,20 @@ export function HomePageClient() {
     window.history.pushState({}, '', window.location.pathname);
   }, []);
 
-  // === THIS IS THE FINAL RENDER LOGIC ===
+  // === THIS IS THE FINAL, CORRECT RENDER LOGIC ===
 
-  // 1. If the AuthProvider is still checking the session, show the full page skeleton.
-   if (status === 'initializing') {
+  // 1. If our auth state is still initializing, show the full page skeleton.
+  if (status === 'initializing') {
     return <PageSkeleton />;
   }
 
-  // 2. If auth is done loading, AND a user exists, BUT they don't have a profile yet.
+  // 2. If we know the user is authenticated but needs a profile.
   if (status === 'authenticated_no_profile') {
-    return <ProfileSetup userId={user!.id} />; // We can safely use `!` because user is guaranteed to exist in this state.
+    // We can safely use `!` because user is guaranteed to exist in this state.
+    return <ProfileSetup userId={user!.id} />;
   }
-
-  // 3. If a specific debate is selected, show that view.
+  
+  // 3. If a specific debate is selected, show its view.
   if (selectedDebate) {
     return <DebateView debate={selectedDebate} onBack={handleBackToDebates} />;
   }
@@ -159,6 +150,9 @@ export function HomePageClient() {
             </Select>
           </div>
           <div className="flex items-center">
+            {/* The `user && profile` check is still correct here.
+                It only shows the button if the user is fully authenticated with a profile.
+                This implicitly covers the `status === 'authenticated_with_profile'` case. */}
             {user && profile && (
               <Button 
                 onClick={() => setShowCreateModal(true)} 
