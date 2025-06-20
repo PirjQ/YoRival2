@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { useAuth } from '@/hooks/use-auth';
+import { useAuthContext } from '@/contexts/auth-provider';
 import { supabase } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
 import { DebateCard } from '@/components/debates/debate-card';
@@ -25,7 +25,7 @@ type Debate = {
 };
 
 export function HomePageClient({ initialDebates }: { initialDebates: Debate[] }) {
-  const { user, profile, loading } = useAuth();
+  const { user, profile, loading } = useAuthContext();
   const searchParams = useSearchParams();
   const [debates, setDebates] = useState<Debate[]>(initialDebates);
   const [selectedDebate, setSelectedDebate] = useState<Debate | null>(null);
