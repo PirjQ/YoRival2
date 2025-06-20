@@ -9,20 +9,18 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-// FIX 1: Import the context hook
-import { useAuthContext } from '@/contexts/auth-provider';
+// We no longer need to import useAuthContext here.
 
-// FIX 2: The `onComplete` prop is no longer needed
+// The onComplete prop is required again.
 interface ProfileSetupProps {
   userId: string;
+  onComplete: () => void;
 }
 
-export function ProfileSetup({ userId }: ProfileSetupProps) {
+export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  // FIX 3: Get the `refreshProfile` function from the context
-  const { refreshProfile } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,6 +28,7 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
     setLoading(true);
 
     try {
+      // Check if username is taken
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('username')
@@ -42,15 +41,15 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
         return;
       }
 
+      // Create profile
       const { error } = await supabase.from('profiles').insert({ id: userId, username });
       if (error) throw error;
 
       toast({ title: 'Profile created!', description: 'Welcome to YoRival!' });
       
-      // FIX 4: This call updates the global state. HomePageClient will see the
-      // new profile and automatically re-render to show the main page.
-      await refreshProfile();
-      // The old onComplete prop is GONE.
+      // FIX: We are no longer calling the non-existent `refreshProfile`.
+      // We are going back to the reliable `onComplete` prop that tells the parent to handle it.
+      onComplete();
 
     } catch (error: any) {
       toast({ title: 'Error creating profile', description: error.message, variant: 'destructive' });
