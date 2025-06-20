@@ -9,10 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-// FIX 1: Import the new context hook
 import { useAuthContext } from '@/contexts/auth-provider';
 
-// FIX 2: The `onComplete` prop is no longer needed or required.
+// This component no longer needs the onComplete prop
 interface ProfileSetupProps {
   userId: string;
 }
@@ -21,7 +20,6 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
-  // FIX 3: Get the `refreshProfile` function from our one true source.
   const { refreshProfile } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +28,6 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
     setLoading(true);
 
     try {
-      // Check if username is taken
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('username')
@@ -38,36 +35,22 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
         .maybeSingle();
 
       if (existingProfile) {
-        toast({
-          title: 'Username taken',
-          description: 'Please choose a different username.',
-          variant: 'destructive',
-        });
+        toast({ title: 'Username taken', description: 'Please choose a different username.', variant: 'destructive' });
         setLoading(false);
         return;
       }
 
-      // Create profile
       const { error } = await supabase.from('profiles').insert({ id: userId, username });
       if (error) throw error;
 
-      toast({
-        title: 'Profile created!',
-        description: 'Welcome to YoRival!',
-      });
-
-      // FIX 4: This is the key. We tell the global provider to refresh its state.
-      // This will automatically change the `status` to 'authenticated_with_profile',
-      // causing HomePageClient to re-render and show the main page.
-      // No page reload or `onComplete` prop needed.
+      toast({ title: 'Profile created!', description: 'Welcome to YoRival!' });
+      
+      // Tell the global provider to re-fetch the profile. This will automatically
+      // cause HomePageClient to re-render and show the main page.
       await refreshProfile();
 
     } catch (error: any) {
-      toast({
-        title: 'Error creating profile',
-        description: error.message,
-        variant: 'destructive',
-      });
+      toast({ title: 'Error creating profile', description: error.message, variant: 'destructive' });
     } finally {
       setLoading(false);
     }
@@ -78,26 +61,14 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">Complete Your Profile</CardTitle>
-          <CardDescription>
-            Choose a username for your YoRival account
-          </CardDescription>
+          <CardDescription>Choose a username for your YoRival account</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="username">Username</Label>
-              <Input
-                id="username"
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="Your public username"
-                required
-                className="text-center"
-              />
-              <p className="text-sm text-muted-foreground">
-                This will be your public handle on YoRival
-              </p>
+              <Input id="username" type="text" value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Your public username" required className="text-center" />
+              <p className="text-sm text-muted-foreground">This will be your public handle on YoRival</p>
             </div>
             <Button type="submit" className="w-full" disabled={loading || !username.trim()}>
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
