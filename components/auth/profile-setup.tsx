@@ -9,19 +9,19 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+// FIX 1: Import the context hook
 import { useAuthContext } from '@/contexts/auth-provider';
-// We no longer need to import useAuthContext here.
 
-// The onComplete prop is required again.
+// FIX 2: The `onComplete` prop is GONE. It is no longer needed.
 interface ProfileSetupProps {
   userId: string;
-  onComplete: () => void;
 }
 
-export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
+export function ProfileSetup({ userId }: ProfileSetupProps) {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  // FIX 3: Get the `refreshProfile` function from the global context
   const { refreshProfile } = useAuthContext();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,7 +30,6 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
     setLoading(true);
 
     try {
-      // Check if username is taken
       const { data: existingProfile } = await supabase
         .from('profiles')
         .select('username')
@@ -43,15 +42,14 @@ export function ProfileSetup({ userId, onComplete }: ProfileSetupProps) {
         return;
       }
 
-      // Create profile
       const { error } = await supabase.from('profiles').insert({ id: userId, username });
       if (error) throw error;
 
       toast({ title: 'Profile created!', description: 'Welcome to YoRival!' });
       
-      // FIX: We are no longer calling the non-existent `refreshProfile`.
-      // We are going back to the reliable `onComplete` prop that tells the parent to handle it.
-      onComplete();
+      // FIX 4: This call tells the AuthProvider to re-check the profile.
+      // This will change the global status to 'authenticated_ready', and
+      // HomePageClient will automatically show the main page. No reload needed.
       await refreshProfile();
 
     } catch (error: any) {
