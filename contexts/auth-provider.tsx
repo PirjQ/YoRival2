@@ -11,69 +11,61 @@ interface Profile {
   username: string;
 }
 
-// Define the shape of the context. This is what components will receive.
+// Define the shape of the context
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   session: Session | null;
-  loading: boolean; // The single, reliable loading state for the initial auth check.
+  loading: boolean;
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  // Use unambiguous state names to prevent shadowing.
-  const [activeSession, setActiveSession] = useState<Session | null>(null);
-  const [userProfile, setUserProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true); // Start in a loading state.
+  const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true); // Always start loading
 
   const fetchProfile = useCallback(async (user: User | null) => {
     if (!user) {
-      setUserProfile(null);
+      setProfile(null);
       return;
     }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error && error.code !== 'PGRST116') console.error("Profile fetch error:", error);
-    setUserProfile(data);
+    setProfile(data);
   }, []);
 
-  // This is the most important part. This useEffect runs ONLY ONCE when the app loads.
+  // This is the single most important piece of code.
+  // It runs ONCE on mount and handles EVERYTHING.
   useEffect(() => {
-    // This function checks the initial session state on the client.
-    const getInitialSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setActiveSession(session);
-      await fetchProfile(session?.user ?? null);
-      setLoading(false); // Initial check is complete.
-    };
-
-    getInitialSession();
-
-    // This listener handles all subsequent auth changes (SIGN_IN, SIGN_OUT, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setActiveSession(newSession);
-        await fetchProfile(newSession?.user ?? null);
+      async (_event, session) => {
+        // This callback fires on initial load, sign-in, sign-out, and token refresh.
+        setSession(session);
+        await fetchProfile(session?.user ?? null);
+        // Once we have checked the session and profile, we are no longer loading.
+        setLoading(false);
       }
     );
 
+    // Cleanup the subscription when the component unmounts
     return () => {
       subscription.unsubscribe();
     };
-  // The empty dependency array `[]` GUARANTEES this runs only once.
-  }, [fetchProfile]);
+  }, [fetchProfile]); // The dependency array is stable
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
 
   const value = {
-    session: activeSession,
-    user: activeSession?.user ?? null,
-    profile: userProfile,
+    session,
+    user: session?.user ?? null,
+    profile,
     loading,
-    signOut
+    signOut,
   };
 
   return (
