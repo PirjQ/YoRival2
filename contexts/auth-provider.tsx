@@ -14,7 +14,7 @@ interface Profile {
 // Define the shape of the context
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
+  Profile | null | undefined;
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
