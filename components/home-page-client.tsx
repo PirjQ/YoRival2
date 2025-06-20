@@ -124,7 +124,12 @@ export function HomePageClient() {
   }
 
   // 2. If auth is done loading, AND a user exists, BUT they don't have a profile yet.
-  if (user && !profile) {
+  if (user && profile === undefined) {
+    return <PageSkeleton />;
+  }
+
+  // 3. Now, if we have a user and we know their profile is null (or doesn't exist), show the setup form.
+  if (user && profile === null) {
     return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
   }
 
