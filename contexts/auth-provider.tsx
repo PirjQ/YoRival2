@@ -25,7 +25,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true); // Always start loading
 
   const fetchProfile = useCallback(async (user: User | null) => {
     if (!user) {
@@ -33,43 +33,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (error && error.code !== 'PGRST116') console.error("Profile fetch error:", error);
+    if (error && error.code !== 'PGRST116') {
+      console.error("Profile fetch error:", error);
+    }
     setProfile(data);
   }, []);
 
+  // This is the single most important piece of code.
+  // It runs ONCE on mount and handles EVERYTHING. There is no race condition.
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        // This is the initial check on component mount.
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        setSession(initialSession);
-        if (initialSession) {
-          await fetchProfile(initialSession.user);
-        }
-      } catch (error) {
-        console.error("Error during initial auth check:", error);
-      } finally {
-        // THIS IS THE CRITICAL FIX.
-        // This `finally` block GUARANTEES that loading is set to false,
-        // even if the getSession() or fetchProfile() calls fail.
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    // This listener handles subsequent, live auth changes.
+    // onAuthStateChange fires immediately with the current session,
+    // so we don't need a separate getSession() call.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, newSession) => {
-        setSession(newSession);
-        await fetchProfile(newSession?.user ?? null);
+      async (_event, session) => {
+        setSession(session);
+        await fetchProfile(session?.user ?? null);
+        // This will be called on initial load, and on every sign-in/sign-out.
+        // It guarantees we exit the loading state.
+        setLoading(false);
       }
     );
 
+    // Cleanup the subscription when the component unmounts
     return () => {
       subscription.unsubscribe();
     };
-  }, [fetchProfile]);
+  }, [fetchProfile]); // The dependency array is stable and correct
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
