@@ -1,4 +1,3 @@
-
 // contexts/auth-provider.tsx
 'use client';
 
@@ -12,59 +11,70 @@ interface Profile {
   username: string;
 }
 
-// Define the shape of the context
+// Define the shape of the context. This is what components will receive.
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
-  session: Session | null; // <-- ADD THIS LINE
-  loading: boolean;
+  session: Session | null;
+  loading: boolean; // The single, reliable loading state for the initial auth check.
   signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Use unambiguous state names to prevent shadowing.
+  const [activeSession, setActiveSession] = useState<Session | null>(null);
+  const [userProfile, setUserProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true); // Start in a loading state.
 
   const fetchProfile = useCallback(async (user: User | null) => {
     if (!user) {
-      setProfile(null);
+      setUserProfile(null);
       return;
     }
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error && error.code !== 'PGRST116') console.error("Profile fetch error:", error);
-    setProfile(data);
+    setUserProfile(data);
   }, []);
-  
+
+  // This is the most important part. This useEffect runs ONLY ONCE when the app loads.
   useEffect(() => {
-    // This runs only once on the client to check the session
+    // This function checks the initial session state on the client.
     const getInitialSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
+      setActiveSession(session);
       await fetchProfile(session?.user ?? null);
-      setLoading(false);
+      setLoading(false); // Initial check is complete.
     };
-    
+
     getInitialSession();
 
+    // This listener handles all subsequent auth changes (SIGN_IN, SIGN_OUT, etc.)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setUser(session?.user ?? null);
-        await fetchProfile(session?.user ?? null);
-        setLoading(false);
+      async (_event, newSession) => {
+        setActiveSession(newSession);
+        await fetchProfile(newSession?.user ?? null);
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
+  // The empty dependency array `[]` GUARANTEES this runs only once.
   }, [fetchProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
 
-  const value = { user, profile, session, loading, signOut };
+  const value = {
+    session: activeSession,
+    user: activeSession?.user ?? null,
+    profile: userProfile,
+    loading,
+    signOut
+  };
 
   return (
     <AuthContext.Provider value={value}>
@@ -73,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   );
 }
 
+// This is the hook your components will use.
 export function useAuthContext() {
   const context = useContext(AuthContext);
   if (context === undefined) {
