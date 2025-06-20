@@ -27,7 +27,7 @@ type Debate = {
 
 // This component no longer accepts `initialDebates` as a prop.
 export function HomePageClient() {
-  const { user, profile, loading: authLoading } = useAuthContext();
+  const { user, profile, status } = useAuthContext();
   const searchParams = useSearchParams();
   const [debates, setDebates] = useState<Debate[]>([]);
   // A new, separate loading state specifically for the debates data.
@@ -119,18 +119,13 @@ export function HomePageClient() {
   // === THIS IS THE FINAL RENDER LOGIC ===
 
   // 1. If the AuthProvider is still checking the session, show the full page skeleton.
-  if (authLoading) {
+   if (status === 'initializing') {
     return <PageSkeleton />;
   }
 
   // 2. If auth is done loading, AND a user exists, BUT they don't have a profile yet.
-  if (user && profile === undefined) {
-    return <PageSkeleton />;
-  }
-
-  // 3. Now, if we have a user and we know their profile is null (or doesn't exist), show the setup form.
-  if (user && profile === null) {
-    return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
+  if (status === 'authenticated_no_profile') {
+    return <ProfileSetup userId={user!.id} />; // We can safely use `!` because user is guaranteed to exist in this state.
   }
 
   // 3. If a specific debate is selected, show that view.
