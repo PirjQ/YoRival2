@@ -5,21 +5,19 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-// Define the possible states of our authentication flow
-type AuthStatus = 'initializing' | 'unauthenticated' | 'authenticated_no_profile' | 'authenticated_with_profile';
-
+// Define your Profile type
 interface Profile {
   id: string;
   username: string;
 }
 
+// Define the shape of the context
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   session: Session | null;
-  status: AuthStatus; // We use a status string instead of a boolean
+  loading: boolean;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -27,50 +25,41 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [status, setStatus] = useState<AuthStatus>('initializing');
+  const [loading, setLoading] = useState(true); // Always start loading
 
-  const refreshProfile = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      setProfile(null);
-      return;
-    }
-    const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    setProfile(data);
-  }, []);
-  
+  // This useEffect handles ONLY the authentication state.
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
+    // onAuthStateChange fires immediately with the current session,
+    // so we don't need a separate getSession() call. This is the key.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      // The moment we know the session, we are no longer loading the auth state.
+      setLoading(false);
+    });
 
-        if (!session?.user) {
-          // If there's no user, the state is clear.
-          setProfile(null);
-          setStatus('unauthenticated');
-          return;
-        }
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, []); // The empty array ensures this runs only ONCE.
 
-        // If there is a user, fetch their profile.
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        
-        setProfile(profileData);
-
-        // NOW we can determine the final, correct state.
-        if (profileData) {
-          setStatus('authenticated_with_profile');
-        } else {
-          setStatus('authenticated_no_profile');
-        }
-      }
-    );
-
-    return () => subscription.unsubscribe();
-  }, []);
+  // This SECOND useEffect handles fetching the profile.
+  // It runs only when the session changes.
+  useEffect(() => {
+    const user = session?.user;
+    if (user) {
+      supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(({ data }) => {
+          setProfile(data);
+        });
+    } else {
+      // Clear profile when user logs out
+      setProfile(null);
+    }
+  }, [session]); // This hook depends only on the session.
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -80,9 +69,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user: session?.user ?? null,
     profile,
-    status,
+    loading,
     signOut,
-    refreshProfile,
   };
 
   return (
