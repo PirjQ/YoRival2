@@ -10,52 +10,60 @@ interface Profile {
   username: string;
 }
 
-// FIX 1: This is the complete and correct type definition for your working provider.
-// We are re-adding `refreshProfile`.
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null | undefined; // `undefined` means "we haven't checked yet"
+  profile: Profile | null | undefined;
   session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>; 
+  refreshProfile: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
-  // FIX 2: Initialize profile as `undefined` to fix the flash.
+  // FIX: Initialize profile as `undefined`. `undefined` now means "we don't know yet".
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   // This is the refresh function ProfileSetup will use.
   const refreshProfile = useCallback(async () => {
+    console.log("AuthProvider: refreshProfile called.");
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      console.log("AuthProvider: refreshProfile fetching for user", user.id);
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      console.log("AuthProvider: refreshProfile got profile data:", data);
       setProfile(data || null); // Set to data or explicitly null
     } else {
+      console.log("AuthProvider: refreshProfile found no user, setting profile to null.");
       setProfile(null);
     }
   }, []);
 
   // This is YOUR WORKING useEffect that solves the "stuck" issue.
-  // We are NOT changing its logic.
   useEffect(() => {
+    console.log("AuthProvider: Main listener useEffect runs.");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log(`AuthProvider: onAuthStateChange fired! Event: ${_event}. Has session: ${!!session}. Setting loading to false.`);
       setSession(session);
       setLoading(false);
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("AuthProvider: Main listener unsubscribes.");
+      subscription.unsubscribe();
+    };
   }, []);
 
   // This second useEffect fetches the profile when the session changes.
   useEffect(() => {
+    console.log("AuthProvider: Profile fetch useEffect runs because session changed. Session exists:", !!session);
     if (session?.user) {
       refreshProfile();
     } else {
-      // If there is no session, we know the profile is null.
+      // If there is no session, we know for a fact the profile is null.
+      console.log("AuthProvider: No session, setting profile to null.");
       setProfile(null);
     }
   }, [session, refreshProfile]);
@@ -64,7 +72,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  // FIX 3: Add `refreshProfile` back to the value object.
   const value = {
     session,
     user: session?.user ?? null,
