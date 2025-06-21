@@ -7,18 +7,30 @@ import { ProfileSetup } from "./auth/profile-setup";
 import { HomePageClient } from "./home-page-client";
 
 export function AuthWrapper() {
-  const { user, profile, loading } = useAuthContext();
+  const { user, profile, loading: authLoading } = useAuthContext();
 
-  // 1. If the entire auth process (session AND profile) is not yet complete, show the skeleton.
-  if (loading) {
+  console.log(`--- AuthWrapper RENDER --- authLoading: ${authLoading}, user: ${!!user}, profile:`, profile);
+
+  // 1. If the initial auth check is happening.
+  if (authLoading) {
+    console.log("  > Wrapper DECISION: Show PageSkeleton (initial auth loading).");
     return <PageSkeleton />;
   }
 
-  // 2. If the process is complete, and we have a user but no profile.
-  if (user && !profile) {
+  // 2. THE FIX FOR THE FLASH: If auth is done, we have a user,
+  // but the profile is still `undefined` (meaning the profile fetch hasn't completed).
+  if (user && profile === undefined) {
+    console.log("  > Wrapper DECISION: Show PageSkeleton (waiting for profile).");
+    return <PageSkeleton />;
+  }
+
+  // 3. If auth is done, we have a user, and we know for a fact their profile is `null`.
+  if (user && profile === null) {
+    console.log("  > Wrapper DECISION: Show ProfileSetup.");
     return <ProfileSetup userId={user.id} />;
   }
 
-  // 3. If the process is complete and the user is logged in with a profile, or not logged in at all.
+  // 4. If all checks pass, render the main client component.
+  console.log("  > Wrapper DECISION: Show HomePageClient.");
   return <HomePageClient />;
 }
