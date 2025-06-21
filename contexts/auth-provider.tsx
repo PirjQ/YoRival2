@@ -49,8 +49,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log(`AuthProvider: onAuthStateChange fired! Event: ${_event}. Has session: ${!!session}.`);
       setSession(session);
       
-      // Don't change authLoading here - let the profile fetch effect handle it
-      // This prevents the flash between session detection and profile fetch completion
+      // If we have a session, immediately set loading to true to prevent flash
+      // If no session, we can safely set loading to false
+      if (session?.user) {
+        setAuthLoading(true);
+      } else {
+        setAuthLoading(false);
+      }
     });
     return () => {
       console.log("AuthProvider: Main listener unsubscribes.");
@@ -64,8 +69,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (session?.user) {
       console.log("AuthProvider: Fetching profile for user", session.user.id);
-      // Keep authLoading true while we fetch the profile
-      setAuthLoading(true);
+      // authLoading is already true from the auth state change handler
       
       const fetchProfile = async () => {
         try {
