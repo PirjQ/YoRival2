@@ -26,7 +26,7 @@ type Debate = {
 };
 
 export function HomePageClient() {
-  const { user, profile, loading: authLoading } = useAuthContext();
+  const { user, profile } = useAuthContext();
   const searchParams = useSearchParams();
   const [debates, setDebates] = useState<Debate[]>([]);
   const [dataLoading, setDataLoading] = useState(true);
@@ -106,21 +106,7 @@ export function HomePageClient() {
 
   // === THIS IS THE FINAL, CORRECT RENDER LOGIC ===
 
-  //1. If the auth provider is doing its initial check.
-  if (authLoading) {
-    return <PageSkeleton />;
-  }
 
-  // 2. THE FIX FOR THE FLASH: If we have a user, but the profile state is `undefined`
-  // (meaning the profile fetch hasn't completed), show the skeleton.
-  if (user && profile === undefined) {
-    return <PageSkeleton />;
-  }
-
-  // 3. If we have a user, and we know for a fact their profile is `null`.
-  if (user && profile === null) {
-    return <ProfileSetup userId={user.id} />;
-  }
 
   // 4. If a specific debate is selected, show its view.
   if (selectedDebate) {
