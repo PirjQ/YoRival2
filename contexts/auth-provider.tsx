@@ -5,7 +5,11 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-interface Profile { id: string; username: string; }
+interface Profile {
+  id: string;
+  username: string;
+}
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -21,50 +25,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  console.log(`--- AuthProvider RENDER --- loading: ${loading}, user: ${!!user}, profile: ${!!profile}`);
-
+  // This one useEffect handles EVERYTHING.
   useEffect(() => {
-    console.log("AuthProvider: Main useEffect runs ONCE.");
-
+    // onAuthStateChange fires immediately. This is our only source of truth.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log(`EVENT: ${event}. Session exists: ${!!session}`);
-        
+      async (_event, session) => {
         const currentUser = session?.user;
         setUser(currentUser ?? null);
 
-        if (currentUser) {
-          console.log(`  > User found (${currentUser.id}). Fetching profile...`);
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', currentUser.id)
-            .single();
-
-          if (error && error.code !== 'PGRST116') {
-            console.error("  > Profile fetch error:", error);
+        // We wrap the profile fetch in a try...finally block.
+        // This GUARANTEES that loading is set to false, no matter what.
+        try {
+          if (currentUser) {
+            const { data: profileData } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', currentUser.id)
+              .single();
+            setProfile(profileData || null);
+          } else {
+            setProfile(null);
           }
-          
-          console.log("  > Profile data received:", profileData);
-          setProfile(profileData || null);
-        } else {
-          console.log("  > No user. Clearing profile.");
+        } catch (error) {
+          console.error("Error fetching profile inside listener:", error);
           setProfile(null);
+        } finally {
+          // This will run whether the profile fetch succeeded or failed.
+          // This is the key to never getting stuck.
+          setLoading(false);
         }
-        
-        console.log("  > FINAL STEP: Setting loading to false.");
-        setLoading(false);
       }
     );
 
     return () => {
-      console.log("AuthProvider: Unsubscribing from auth changes.");
       subscription.unsubscribe();
     };
-  }, []);
+  }, []); // Empty array ensures this runs only once.
 
   const refreshProfile = useCallback(async () => {
-    console.log("refreshProfile called.");
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       setProfile(data || null);
@@ -75,13 +73,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  const value = { user, profile, loading, signOut, refreshProfile };
+  const value = {
+    user,
+    profile,
+    loading,
+    signOut,
+    refreshProfile,
+  };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuthContext() {
   const context = useContext(AuthContext);
-  if (context === undefined) throw new Error('useAuthContext must be used within an AuthProvider');
+  if (context === undefined) {
+    throw new Error('useAuthContext must be used within an AuthProvider');
+  }
   return context;
 }
