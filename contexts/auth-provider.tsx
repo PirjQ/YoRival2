@@ -24,8 +24,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
-  const [authLoading, setAuthLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   // This is the refresh function ProfileSetup will use.
   const refreshProfile = useCallback(async () => {
@@ -48,14 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log(`AuthProvider: onAuthStateChange fired! Event: ${_event}. Has session: ${!!session}.`);
       setSession(session);
-      
-      // If we have a session, immediately set loading to true to prevent flash
-      // If no session, we can safely set loading to false
-      if (session?.user) {
-        setAuthLoading(true);
-      } else {
-        setAuthLoading(false);
-      }
+      // Don't change loading state here - let the profile fetch effect handle it
     });
     return () => {
       console.log("AuthProvider: Main listener unsubscribes.");
@@ -69,7 +61,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (session?.user) {
       console.log("AuthProvider: Fetching profile for user", session.user.id);
-      // authLoading is already true from the auth state change handler
+      // Keep loading true while we fetch profile
+      setLoading(true);
       
       const fetchProfile = async () => {
         try {
@@ -80,8 +73,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           console.error("AuthProvider: Profile fetch error:", error);
           setProfile(null);
         } finally {
-          // Only now set authLoading to false - profile fetch is complete
-          setAuthLoading(false);
+          // Only now set loading to false - profile fetch is complete
+          setLoading(false);
         }
       };
       
@@ -90,7 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // If there is no session, we know for a fact the profile is null.
       console.log("AuthProvider: No session, setting profile to null.");
       setProfile(null);
-      setAuthLoading(false);
+      setLoading(false);
     }
   }, [session]);
 
@@ -102,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session,
     user: session?.user ?? null,
     profile,
-    loading: authLoading,
+    loading,
     signOut,
     refreshProfile,
   };
