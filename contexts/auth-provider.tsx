@@ -12,7 +12,7 @@ interface Profile {
 
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
+  profile: Profile | null | undefined;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -22,7 +22,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
   // This one useEffect handles EVERYTHING.
