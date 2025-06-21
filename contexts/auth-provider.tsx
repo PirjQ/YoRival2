@@ -26,6 +26,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // FIX: Initialize profile as `undefined`. `undefined` now means "we don't know yet".
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   // This is the refresh function ProfileSetup will use.
   const refreshProfile = useCallback(async () => {
@@ -60,15 +61,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     console.log("AuthProvider: Profile fetch useEffect runs because session changed. Session exists:", !!session);
     if (session?.user) {
-      refreshProfile();
+      // Only reset profile to null if this is the very first load
+      // or if the user ID has actually changed
+      if (!initialLoadComplete || (profile && profile.id !== session.user.id)) {
+        console.log("AuthProvider: Resetting profile and fetching new data");
+        setProfile(undefined);
+      }
+      refreshProfile().then(() => {
+        if (!initialLoadComplete) {
+          setInitialLoadComplete(true);
+        }
+      });
     } else {
       // If there is no session, we know for a fact the profile is null.
       console.log("AuthProvider: No session, setting profile to null.");
       setProfile(null);
+      setInitialLoadComplete(true);
     }
-  }, [session, refreshProfile]);
+  }, [session, refreshProfile, profile, initialLoadComplete]);
 
   const signOut = useCallback(async () => {
+    setInitialLoadComplete(false);
     await supabase.auth.signOut();
   }, []);
 
