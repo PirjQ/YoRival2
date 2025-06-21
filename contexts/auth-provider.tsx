@@ -12,7 +12,7 @@ interface Profile {
 
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null | undefined;
+  profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -22,12 +22,12 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
+  const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // This one useEffect handles EVERYTHING.
+  // This one useEffect handles EVERYTHING. It is the single source of truth.
   useEffect(() => {
-    // onAuthStateChange is smart. It fires immediately with the current session.
+    // onAuthStateChange fires immediately with the current session.
     // We do not need a separate getSession() call. This was the source of all race conditions.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -47,8 +47,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           setProfile(null);
         }
         
-        // This is the most important line. It only runs after BOTH the session
-        // AND the profile have been checked.
+        // THIS IS THE MOST IMPORTANT LINE.
+        // It only runs after BOTH the session AND the profile have been checked.
         setLoading(false);
       }
     );
@@ -59,6 +59,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []); // The empty dependency array ensures this runs only once.
 
   const refreshProfile = useCallback(async () => {
+    // This function can be called by ProfileSetup to force a re-check
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       setProfile(data || null);
