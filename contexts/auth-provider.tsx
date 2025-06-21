@@ -27,28 +27,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // FIX 2: Initialize profile as `undefined`.
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
-
+  console.log("AuthProvider RENDER. Loading:", loading, "User:", session?.user?.id, "Profile:", profile?.username);
   const refreshProfile = useCallback(async () => {
+    console.log("AuthProvider: refreshProfile called.");
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
+      console.log("AuthProvider: refreshProfile fetching for user", user.id);
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
+      console.log("AuthProvider: refreshProfile got data:", data);
       setProfile(data || null); // Set to data or explicitly null
     } else {
+      console.log("AuthProvider: refreshProfile found no user.");
       setProfile(null);
     }
   }, []);
 
   // This is YOUR WORKING useEffect that solves the "stuck" issue.
   useEffect(() => {
+    console.log("AuthProvider: Main listener useEffect runs.");
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      console.log('%c AuthProvider: onAuthStateChange fired!', 'color: green', { event: _event, hasSession: !!session });
       setSession(session);
       setLoading(false);
     });
-    return () => subscription.unsubscribe();
+    return () => {
+      console.log("AuthProvider: Main listener unsubscribes.");
+      subscription.unsubscribe();
+
+    }
   }, []);
 
   // This second useEffect fetches the profile when the session changes.
   useEffect(() => {
+    console.log("AuthProvider: Profile fetch useEffect runs. Session exists:", !!session);
     if (session?.user) {
       refreshProfile();
     } else {
