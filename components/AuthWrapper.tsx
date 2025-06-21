@@ -11,26 +11,25 @@ export function AuthWrapper() {
 
   console.log(`--- AuthWrapper RENDER --- authLoading: ${authLoading}, user: ${!!user}, profile:`, profile);
 
-  // 1. If the initial auth check is happening.
+  // 1. If the initial auth check is happening, always show loading
   if (authLoading) {
     console.log("  > Wrapper DECISION: Show PageSkeleton (initial auth loading).");
     return <PageSkeleton />;
   }
 
-  // 2. THE FIX FOR THE FLASH: If auth is done, we have a user,
-  // but the profile is still `undefined` (meaning the profile fetch hasn't completed).
+  // 2. If we have a user but profile is still undefined (fetch in progress), keep loading
   if (user && profile === undefined) {
-    console.log("  > Wrapper DECISION: Show PageSkeleton (waiting for profile).");
+    console.log("  > Wrapper DECISION: Show PageSkeleton (profile fetch in progress).");
     return <PageSkeleton />;
   }
 
-  // 3. If auth is done, we have a user, and we know for a fact their profile is `null`.
+  // 3. If we have a user and profile is explicitly null, they need to set up profile
   if (user && profile === null) {
     console.log("  > Wrapper DECISION: Show ProfileSetup.");
     return <ProfileSetup userId={user.id} />;
   }
 
-  // 4. If all checks pass, render the main client component.
+  // 4. All other cases (no user, or user with profile) show main page
   console.log("  > Wrapper DECISION: Show HomePageClient.");
   return <HomePageClient />;
 }

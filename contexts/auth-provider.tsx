@@ -25,12 +25,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [authLoading, setAuthLoading] = useState(true);
-  const [profileLoading, setProfileLoading] = useState(false);
 
   // This is the refresh function ProfileSetup will use.
   const refreshProfile = useCallback(async () => {
     console.log("AuthProvider: refreshProfile called.");
-    setProfileLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       console.log("AuthProvider: refreshProfile fetching for user", user.id);
@@ -41,7 +39,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log("AuthProvider: refreshProfile found no user, setting profile to null.");
       setProfile(null);
     }
-    setProfileLoading(false);
   }, []);
 
   // Main auth state listener
@@ -50,12 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log(`AuthProvider: onAuthStateChange fired! Event: ${_event}. Has session: ${!!session}.`);
       setSession(session);
-      
-      // Only set authLoading to false if there's no session (logged out)
-      // For logged in users, we'll set it to false after profile fetch
-      if (!session) {
-        setAuthLoading(false);
-      }
+      setAuthLoading(false);
     });
     return () => {
       console.log("AuthProvider: Main listener unsubscribes.");
@@ -66,30 +58,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Profile fetch effect - runs when session changes
   useEffect(() => {
     console.log("AuthProvider: Profile fetch useEffect runs because session changed. Session exists:", !!session);
-    setProfileLoading(true);
     
     if (session?.user) {
-      // Fetch profile if we don't have one yet, or if the user ID changed
-      if (profile === undefined || (profile?.id !== session.user.id)) {
-        console.log("AuthProvider: Fetching profile for user", session.user.id);
-        refreshProfile();
-      } else {
-        console.log("AuthProvider: Profile already exists for this user:", profile?.username);
-      }
+      console.log("AuthProvider: Fetching profile for user", session.user.id);
+      refreshProfile();
     } else {
       // If there is no session, we know for a fact the profile is null.
       console.log("AuthProvider: No session, setting profile to null.");
       setProfile(null);
     }
-    setProfileLoading(false);
-  }, [session?.user?.id, profile?.id, refreshProfile]); // Depend on user ID and profile ID
-
-  // Set authLoading to false once we have both session state and profile state resolved
-  useEffect(() => {
-    if (!profileLoading && session !== null) {
-      setAuthLoading(false);
-    }
-  }, [profileLoading, session]);
+  }, [session, refreshProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
