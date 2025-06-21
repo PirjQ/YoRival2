@@ -12,12 +12,8 @@ import { Loader2 } from 'lucide-react';
 // FIX 1: Import the context hook
 import { useAuthContext } from '@/contexts/auth-provider';
 
-// FIX 2: The `onComplete` prop is GONE. It is no longer needed.
-interface ProfileSetupProps {
-  userId: string;
-}
 
-export function ProfileSetup({ userId }: ProfileSetupProps) {
+export function ProfileSetup({ userId }: { userId: string }) {
   const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -26,6 +22,7 @@ export function ProfileSetup({ userId }: ProfileSetupProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!username.trim()) return;
     setLoading(true);
 
     try {
