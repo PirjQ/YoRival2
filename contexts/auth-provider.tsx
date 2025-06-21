@@ -60,19 +60,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     console.log("AuthProvider: Profile fetch useEffect runs because session changed. Session exists:", !!session);
     
     if (session?.user) {
-      // Only fetch profile if we don't have one yet, or if the user ID changed
-      if (profile === undefined || (profile && profile.id !== session.user.id)) {
+      // Fetch profile if we don't have one yet, or if the user ID changed
+      if (profile === undefined || (profile?.id !== session.user.id)) {
         console.log("AuthProvider: Fetching profile for user", session.user.id);
         refreshProfile();
       } else {
-        console.log("AuthProvider: Profile already exists for this user, skipping fetch");
+        console.log("AuthProvider: Profile already exists for this user:", profile?.username);
       }
     } else {
       // If there is no session, we know for a fact the profile is null.
       console.log("AuthProvider: No session, setting profile to null.");
       setProfile(null);
     }
-  }, [session?.user?.id, refreshProfile]); // Only depend on user ID, not the entire profile object
+  }, [session?.user?.id, profile?.id, refreshProfile]); // Depend on user ID and profile ID
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
