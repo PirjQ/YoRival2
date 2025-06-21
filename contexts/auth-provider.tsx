@@ -1,21 +1,21 @@
 // contexts/auth-provider.tsx
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
+// Your Profile and AuthContextType interfaces are correct.
+interface Profile {
+  id: string;
+  username: string;
+}
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
-}
-
-interface Profile {
-  id: string;
-  username: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,56 +25,60 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // This is the only useEffect. It runs once.
+  // This one useEffect handles EVERYTHING.
   useEffect(() => {
-    // This function fetches the profile. It is only called when we have a user.
-    const fetchProfile = async (user: User) => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (error && error.code !== 'PGRST116') {
-        console.error("Profile fetch error:", error);
-      }
-      setProfile(data || null);
-    };
-
     // onAuthStateChange is the single source of truth.
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         const currentUser = session?.user;
         setUser(currentUser ?? null);
 
-        if (currentUser) {
-          // If we have a user, fetch their profile.
-          await fetchProfile(currentUser);
-        } else {
-          // If there's no user, there's no profile.
-          setProfile(null);
+        // We wrap the profile fetch in a try...finally block.
+        // This makes our state update "atomic" and resilient to errors.
+        try {
+          if (currentUser) {
+            const { data: profileData, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', currentUser.id)
+              .single();
+            
+            if (error && error.code !== 'PGRST116') {
+              // If there's a real error fetching the profile, log it.
+              console.error("Error fetching profile inside listener:", error);
+            }
+            setProfile(profileData || null);
+          } else {
+            // If there is no user, there is no profile.
+            setProfile(null);
+          }
+        } catch (error) {
+            console.error("A catastrophic error occurred during profile fetch:", error);
+            setProfile(null);
+        } finally {
+          // THIS IS THE MOST IMPORTANT LINE IN THE ENTIRE APP.
+          // It GUARANTEES that loading becomes false, even if the profile
+          // fetch fails, times out, or throws an error.
+          setLoading(false);
         }
-        
-        // This is the most important line. It runs at the end of every event.
-        setLoading(false);
       }
     );
 
     return () => {
       subscription.unsubscribe();
     };
-  }, []); // The empty array guarantees this runs only once.
+  }, []); // The empty array ensures this runs only once.
 
-  const refreshProfile = async () => {
+  const refreshProfile = useCallback(async () => {
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       setProfile(data || null);
     }
-  };
+  }, [user]);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
-  };
+  }, []);
 
   const value = { user, profile, loading, signOut, refreshProfile };
 
