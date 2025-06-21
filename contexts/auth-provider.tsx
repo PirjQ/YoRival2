@@ -25,6 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [authLoading, setAuthLoading] = useState(true);
+  const [profileLoading, setProfileLoading] = useState(false);
 
   // This is the refresh function ProfileSetup will use.
   const refreshProfile = useCallback(async () => {
@@ -47,7 +48,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log(`AuthProvider: onAuthStateChange fired! Event: ${_event}. Has session: ${!!session}.`);
       setSession(session);
-      setAuthLoading(false);
+      
+      // Only set authLoading to false if there's no session (logged out)
+      // If there's a session, we need to wait for profile fetch
+      if (!session) {
+        setAuthLoading(false);
+      }
     });
     return () => {
       console.log("AuthProvider: Main listener unsubscribes.");
@@ -61,13 +67,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     
     if (session?.user) {
       console.log("AuthProvider: Fetching profile for user", session.user.id);
-      refreshProfile();
+      setProfileLoading(true);
+      
+      const fetchProfile = async () => {
+        try {
+          const { data } = await supabase.from('profiles').select('*').eq('id', session.user.id).single();
+          console.log("AuthProvider: Profile fetch completed, data:", data);
+          setProfile(data || null);
+        } catch (error) {
+          console.error("AuthProvider: Profile fetch error:", error);
+          setProfile(null);
+        } finally {
+          setProfileLoading(false);
+          // Now that profile fetch is done, we can set authLoading to false
+          setAuthLoading(false);
+        }
+      };
+      
+      fetchProfile();
     } else {
       // If there is no session, we know for a fact the profile is null.
       console.log("AuthProvider: No session, setting profile to null.");
       setProfile(null);
+      setProfileLoading(false);
+      setAuthLoading(false);
     }
-  }, [session, refreshProfile]);
+  }, [session]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
