@@ -5,88 +5,76 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-// Your Profile and AuthContextType interfaces are correct.
 interface Profile {
   id: string;
   username: string;
 }
+
+// FIX 1: This is the complete and correct type definition for your working provider.
+// We are re-adding `refreshProfile`.
 interface AuthContextType {
   user: User | null;
-  profile: Profile | null;
+  profile: Profile | null | undefined; // `undefined` means "we haven't checked yet"
+  session: Session | null;
   loading: boolean;
   signOut: () => Promise<void>;
-  refreshProfile: () => Promise<void>;
+  refreshProfile: () => Promise<void>; 
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  // FIX 2: Initialize profile as `undefined` to fix the flash.
+  const [profile, setProfile] = useState<Profile | null | undefined>(undefined);
   const [loading, setLoading] = useState(true);
 
-  // This one useEffect handles EVERYTHING.
-  useEffect(() => {
-    // onAuthStateChange is the single source of truth.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        const currentUser = session?.user;
-        setUser(currentUser ?? null);
-
-        // We wrap the profile fetch in a try...finally block.
-        // This makes our state update "atomic" and resilient to errors.
-        try {
-          if (currentUser) {
-            const { data: profileData, error } = await supabase
-              .from('profiles')
-              .select('*')
-              .eq('id', currentUser.id)
-              .single();
-            
-            if (error && error.code !== 'PGRST116') {
-              // If there's a real error fetching the profile, log it.
-              console.error("Error fetching profile inside listener:", error);
-            }
-            setProfile(profileData || null);
-          } else {
-            // If there is no user, there is no profile.
-            setProfile(null);
-          }
-        } catch (error) {
-            console.error("A catastrophic error occurred during profile fetch:", error);
-            setProfile(null);
-        } finally {
-          // THIS IS THE MOST IMPORTANT LINE IN THE ENTIRE APP.
-          // It GUARANTEES that loading becomes false, even if the profile
-          // fetch fails, times out, or throws an error.
-          setLoading(false);
-        }
-      }
-    );
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, []); // The empty array ensures this runs only once.
-
+  // This is the refresh function ProfileSetup will use.
   const refreshProfile = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-      setProfile(data || null);
+      setProfile(data || null); // Set to data or explicitly null
+    } else {
+      setProfile(null);
     }
-  }, [user]);
+  }, []);
+
+  // This is YOUR WORKING useEffect that solves the "stuck" issue.
+  // We are NOT changing its logic.
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false);
+    });
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // This second useEffect fetches the profile when the session changes.
+  useEffect(() => {
+    if (session?.user) {
+      refreshProfile();
+    } else {
+      // If there is no session, we know the profile is null.
+      setProfile(null);
+    }
+  }, [session, refreshProfile]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
   }, []);
 
-  const value = { user, profile, loading, signOut, refreshProfile };
+  // FIX 3: Add `refreshProfile` back to the value object.
+  const value = {
+    session,
+    user: session?.user ?? null,
+    profile,
+    loading,
+    signOut,
+    refreshProfile,
+  };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuthContext() {
