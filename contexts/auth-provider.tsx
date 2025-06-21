@@ -5,11 +5,7 @@ import { createContext, useContext, useEffect, useState, useCallback } from 'rea
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
 
-interface Profile {
-  id: string;
-  username: string;
-}
-
+interface Profile { id: string; username: string; }
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -25,41 +21,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // This one useEffect handles EVERYTHING. It is the single source of truth.
+  console.log(`--- AuthProvider RENDER --- loading: ${loading}, user: ${!!user}, profile: ${!!profile}`);
+
   useEffect(() => {
-    // onAuthStateChange fires immediately with the current session.
-    // We do not need a separate getSession() call. This was the source of all race conditions.
+    console.log("AuthProvider: Main useEffect runs ONCE.");
+
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log(`EVENT: ${event}. Session exists: ${!!session}`);
+        
         const currentUser = session?.user;
         setUser(currentUser ?? null);
 
         if (currentUser) {
-          // If there is a user, fetch their profile.
-          const { data: profileData } = await supabase
+          console.log(`  > User found (${currentUser.id}). Fetching profile...`);
+          const { data: profileData, error } = await supabase
             .from('profiles')
             .select('*')
             .eq('id', currentUser.id)
             .single();
+
+          if (error && error.code !== 'PGRST116') {
+            console.error("  > Profile fetch error:", error);
+          }
+          
+          console.log("  > Profile data received:", profileData);
           setProfile(profileData || null);
         } else {
-          // If there is no user, there is no profile.
+          console.log("  > No user. Clearing profile.");
           setProfile(null);
         }
         
-        // THIS IS THE MOST IMPORTANT LINE.
-        // It only runs after BOTH the session AND the profile have been checked.
+        console.log("  > FINAL STEP: Setting loading to false.");
         setLoading(false);
       }
     );
 
     return () => {
+      console.log("AuthProvider: Unsubscribing from auth changes.");
       subscription.unsubscribe();
     };
-  }, []); // The empty dependency array ensures this runs only once.
+  }, []);
 
   const refreshProfile = useCallback(async () => {
-    // This function can be called by ProfileSetup to force a re-check
+    console.log("refreshProfile called.");
     if (user) {
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
       setProfile(data || null);
@@ -70,25 +75,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     await supabase.auth.signOut();
   }, []);
 
-  const value = {
-    user,
-    profile,
-    loading,
-    signOut,
-    refreshProfile,
-  };
+  const value = { user, profile, loading, signOut, refreshProfile };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuthContext() {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuthContext must be used within an AuthProvider');
-  }
+  if (context === undefined) throw new Error('useAuthContext must be used within an AuthProvider');
   return context;
 }
