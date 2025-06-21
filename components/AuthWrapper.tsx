@@ -28,7 +28,7 @@ export function AuthWrapper() {
     // We pass a function to reload the page, which is a reliable way
     // to get the new state after profile creation.
     console.log("AuthWrapper DECISION: Show ProfileSetup");
-    return <ProfileSetup userId={user.id} onComplete={() => window.location.reload()} />;
+    return <ProfileSetup userId={user.id} />;
   }
 
   // 4. If all checks pass, render the main client component.
