@@ -13,6 +13,7 @@ import { ProfileSetup } from '@/components/auth/profile-setup';
 import { Plus, Users, Share2, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/ui/logo';
+import Image from 'next/image';
 
 type Debate = {
   id: string;
@@ -175,6 +176,9 @@ export function HomePageClient() {
         )}
       </div>
       <CreateDebateModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} onDebateCreated={handleDebateCreated} />
+        <a href="https://bolt.new/" target="_blank" rel="noopener noreferrer" className="fixed bottom-4 right-4 z-50">
+            <Image src="/black_circle_360x360.png" alt="Powered by Bolt.new" width={100} height={100} className="w-20 h-20 sm:w-24 sm:h-24" />
+        </a>
     </>
   );
 }
