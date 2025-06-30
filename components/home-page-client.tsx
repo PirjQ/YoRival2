@@ -14,7 +14,7 @@ import { Plus, Users, Share2, Loader2 } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Logo } from '@/components/ui/logo';
 import Image from 'next/image';
-import hackathonBadge from '/public/black_circle_360x360.png';
+import hackathonBadge from '/black_circle_360x360.png';
 
 type Debate = {
   id: string;
