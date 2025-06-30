@@ -177,7 +177,7 @@ export function HomePageClient() {
         )}
       </div>
       <CreateDebateModal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} onDebateCreated={handleDebateCreated} />
-        <a href="https://bolt.new/" target="_blank" rel="noopener noreferrer" className="fixed top-10 right-4 z-50">
+        <a href="https://bolt.new/" target="_blank" rel="noopener noreferrer" className="fixed top-40 right-4 z-50">
             <Image src={hackathonBadge} alt="Powered by Bolt.new" width={100} height={100} className="w-20 h-20 sm:w-24 sm:h-24" />
         </a>
     </>
